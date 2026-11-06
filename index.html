@@ -99,7 +99,8 @@ footer{margin-top:28px;text-align:center;color:var(--muted);font-size:.78rem}
 .seg button[aria-pressed=true]{background:var(--brand);color:var(--brand-ink)}
 .rh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .rh h2{margin:0}
-.hist{list-style:none;display:grid;gap:6px}
+.hist{list-style:none;display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+.hist li{min-width:0}
 .hist button{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;text-align:start}
 .hist .tag{flex:none;background:var(--brand-soft);color:var(--brand);padding:2px 9px;border-radius:999px;font-size:.75rem;font-weight:600}
 .hist .u{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem;color:var(--muted);direction:ltr}
@@ -338,9 +339,13 @@ const updateSaveLabel = () => { $("saveText").textContent = saveLabel(); };
 
 async function api(payload){
   const res = await fetch(CONFIG.API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload) });
-  if(!res.ok) throw new Error("http " + res.status);
+  if(!res.ok){
+    let d = ""; try{ d = (await res.json()).detail || ""; }catch(e){}
+    const err = new Error("http " + res.status); err.detail = typeof d === "string" ? d : ""; throw err;
+  }
   return res.json();
 }
+const failMsg = (t, e) => t.fail + (e && e.detail ? `<small style="display:block;margin-top:6px;font-weight:400;opacity:.85;word-break:break-word">${esc(e.detail)}</small>` : "");
 function busy(btn, textId, on, label){ btn.disabled = on; btn.classList.toggle("busy", on); $(textId).textContent = label; }
 function hideResult(){ $("result").hidden = true; infoFor = ""; }
 function showResult(info, u, name){
@@ -367,7 +372,7 @@ async function handleDownload(){
   try{
     const info = CONFIG.API_URL ? await api({ url: u.href, mode: "info" }) : { demo: true };
     showResult(info, u, name);
-  }catch(e){ showStatus("error", t.fail); }
+  }catch(e){ showStatus("error", failMsg(t, e)); }
   finally{ busy($("go"), "goText", false, t.download); }
 }
 
@@ -382,7 +387,7 @@ async function handleSave(){
     if(!data.download_url) throw new Error("bad-response");
     showStatus("success", `${quality === "audio" ? t.readyAudio : t.ready}<a href="${esc(data.download_url)}" download rel="noopener">${saveLabel()}</a>`, "status2");
   }catch(e){
-    showStatus("error", e.message === "no-api" ? t.demo : t.fail, "status2");
+    showStatus("error", e.message === "no-api" ? t.demo : failMsg(t, e), "status2");
   }finally{ busy($("save"), "saveText", false, saveLabel()); }
 }
 
